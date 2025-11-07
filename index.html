@@ -274,99 +274,213 @@ async function toDataURL(url){
 
 // Inline computed styles recursively so the snapshot needs no external CSS
 function inlineStylesDeep(root){
-  const treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+  const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
   do {
-    const el = treeWalker.currentNode;
+    const el = tw.currentNode;
     const cs = getComputedStyle(el);
-    // Build a minimal but robust style set
-    const styleText = Array.from(cs)
-      .map(prop => `${prop}:${cs.getPropertyValue(prop)};`)
-      .join('');
-    el.setAttribute("style", styleText);
-
-    // Remove attributes that can pull external resources during rasterize
-    if (el.tagName === "IMG"){
-      // src will be set later (already data URL at this point)
+    const existing = el.getAttribute("style") || "";
+    const computed = Array.from(cs)
+      .map(p => `${p}:${cs.getPropertyValue(p)};`)
+      .join("");
+    // Keep our own inline styles last so they win
+    el.setAttribute("style", computed + existing);
+    // Keep <img> tags (we strip externals elsewhere), but make them eager
+    if (el.tagName === "IMG") {
       el.removeAttribute("srcset");
       el.removeAttribute("crossorigin");
       el.decoding = "sync";
       el.loading = "eager";
     }
-  } while (treeWalker.nextNode());
+  } while (tw.nextNode());
   return root;
 }
 
 // Build a PNG from the card by cloning, inlining styles, and ensuring images are safe
-async function cardToPNGBlob(cardEl){
-  // Clone & lock size to on-screen pixels
-  const clone = cardEl.cloneNode(true);
+async function embedLogoAsBackground(cloneRoot){
+  const liveImg = document.getElementById("logoImg");
+  const slot    = cloneRoot.querySelector(".logo");
+  if (!slot) return;
+
+  // Remove any <img> node inside the clone (.logo) so XHTML has no <img>
+  const imgInClone = slot.querySelector("img");
+  if (imgInClone) imgInClone.remove();
+
+  // Turn the live logo src into a data: URL (if it isn't one already)
+  let data = "";
+  const src = (liveImg && liveImg.src) ? liveImg.src : "";
+  if (src) {
+    if (src.startsWith("data:")) {
+      data = src;
+    } else {
+      try {
+        const res  = await fetch(src, {mode:"cors"});
+        const blob = await res.blob();
+        data = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+      } catch { /* If blocked, export without logo instead of failing */ }
+    }
+  }
+
+  const prev = slot.getAttribute("style") || "";
+  slot.setAttribute("style",
+    `background-image:${data ? `url('${data}')` : "none"};` +
+    `background-position:center;background-repeat:no-repeat;background-size:contain;${prev}`
+  );
+}
+
+/* --- Build a styled, clipped SVG snapshot of the card (keeps your CSS intact) --- */
+async function buildStyledSVG(cardEl, scale=1, padFraction=0.12){
   const rect = cardEl.getBoundingClientRect();
+  const w = Math.max(1, Math.round(rect.width  * scale));
+  const h = Math.max(1, Math.round(rect.height * scale));
+  const radius = 14; // match .card border-radius
+
+  // square canvas with equal transparent padding
+  const baseSide = Math.max(w, h);
+  const pad = Math.round(baseSide * padFraction);
+  const side = baseSide + pad * 2;
+
+  // center offsets so the card sits dead-center in the square
+  const offsetX = Math.round((side - w) / 2);
+  const offsetY = Math.round((side - h) / 2);
+
+  // clone & lock size to on-screen pixels
+  const clone = cardEl.cloneNode(true);
+  clone.id = "card-export-clone";
+  clone.removeAttribute("role");
   clone.style.width  = rect.width  + "px";
   clone.style.height = rect.height + "px";
 
-  // Make the logo XHTML-safe (no <img>), only data: URLs allowed
-  await replaceLogoWithBackground(clone);
+  // ensure logo is data: background (no taint)
+  await embedLogoAsBackground(clone);
 
-  // Original CSS + resolved CSS variables (preserve grid)
-  const cssText   = document.getElementById("cardStyles").innerHTML;
-  const computed  = getComputedStyle(document.documentElement);
-  const varNames  = Array.from(cssText.matchAll(/--[a-z0-9\-]+/gi)).map(m=>m[0]);
-  const varSet    = Array.from(new Set(varNames));
-  const varBlock  = varSet.map(n => `${n}: ${computed.getPropertyValue(n).trim() || 'initial'};`).join('');
+  // inline current CSS vars + your stylesheet so colors/gradients match
+  const cssText  = document.getElementById("cardStyles").innerHTML || "";
+  const computed = getComputedStyle(document.documentElement);
+  const varNames = Array.from(cssText.matchAll(/--[a-z0-9\-]+/gi)).map(m=>m[0]);
+  const varSet   = Array.from(new Set(varNames));
+  const varBlock = varSet.map(n => `${n}: ${computed.getPropertyValue(n).trim() || 'initial'};`).join('');
 
-  // XHTML payload
   const xhtml = `
-    <div xmlns="http://www.w3.org/1999/xhtml" style="display:inline-block;border-radius:14px;">
-      <style>:root{${varBlock}}${cssText}</style>
+    <div xmlns="http://www.w3.org/1999/xhtml"
+         style="box-sizing:border-box;width:${rect.width}px;height:${rect.height}px;">
+      <style>
+        #card-export-clone{ ${varBlock} }
+        ${cssText}
+        *{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;}
+      </style>
       ${clone.outerHTML}
     </div>
   `.trim();
 
-  // Wrap in SVG (with solid white background) and **scrub any http(s) url()** to avoid taint
-  const scale = Math.min(2, (window.devicePixelRatio||1) * 2);
-  const w = Math.max(1, Math.round(rect.width  * scale));
-  const h = Math.max(1, Math.round(rect.height * scale));
-
+  // square transparent canvas; card centered with rounded clip
   let svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-      <rect width="100%" height="100%" fill="#ffffff"/>
-      <foreignObject width="100%" height="100%">${xhtml}</foreignObject>
+    <svg xmlns="http://www.w3.org/2000/svg" width="${side}" height="${side}" style="background:transparent">
+      <defs>
+        <clipPath id="clipR">
+          <rect x="${offsetX}" y="${offsetY}" width="${w}" height="${h}" rx="${radius}" ry="${radius}"/>
+        </clipPath>
+      </defs>
+      <g clip-path="url(#clipR)">
+        <foreignObject x="${offsetX}" y="${offsetY}" width="${w}" height="${h}">${xhtml}</foreignObject>
+      </g>
     </svg>
   `.trim();
 
-  // Hard scrub: if any external url() sneaks in, nuke it to prevent taint
+  // keep only data: urls inside the export to avoid taint
   svg = svg.replace(/url\((["'])?https?:\/\/.*?\1\)/gi, "none");
-
-  const blobURL = URL.createObjectURL(new Blob([svg], {type:"image/svg+xml"}));
-  try{
-    const img = new Image();
-    img.crossOrigin = "anonymous";   // belt & suspenders
-    img.decoding    = "async";
-    await new Promise((res, rej)=>{ img.onload=res; img.onerror=rej; img.src=blobURL; });
-
-    const canvas = document.createElement("canvas");
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, w, h);
-
-    return await new Promise((resolve, reject) => {
-      if (!canvas.toBlob) {
-        try {
-          const dataURL = canvas.toDataURL("image/png", 0.95);
-          const bin = atob(dataURL.split(",")[1]);
-          const arr = new Uint8Array(bin.length);
-          for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-          resolve(new Blob([arr], {type:"image/png"}));
-        } catch(e){ reject(e); }
-      } else {
-        canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png", 0.95);
-      }
-    });
-  } finally {
-    URL.revokeObjectURL(blobURL);
-  }
+  return svg;
 }
 
+/* --- PNG exporter using the styled SVG above --- */
+async function cardToPNGBlob(cardEl){
+  const scale = Math.min(2, (window.devicePixelRatio||1) * 2);
+  // keep your centering pad (0.12 was working for you)
+  const svg   = await buildStyledSVG(cardEl, scale, 0.12);
+  const dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+
+  const img = new Image();
+  img.decoding = "async";
+  await new Promise((res, rej)=>{ img.onload = res; img.onerror = rej; img.src = dataUrl; });
+
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, w, h);
+
+  return await new Promise((resolve, reject) => {
+    if (!canvas.toBlob) {
+      try {
+        const dataURL = canvas.toDataURL("image/png", 0.95);
+        const bin = atob(dataURL.split(",")[1]);
+        const arr = new Uint8Array(bin.length);
+        for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+        resolve(new Blob([arr], {type:"image/png"}));
+      } catch(e){ reject(e); }
+    } else {
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png", 0.95);
+    }
+  });
+}
+
+async function buildExactSVG(cardEl){
+  const rect = cardEl.getBoundingClientRect();
+  const w = Math.round(rect.width);
+  const h = Math.round(rect.height);
+  const radius = 14;
+
+  const clone = cardEl.cloneNode(true);
+  clone.id = "card-export-clone";
+  clone.style.width  = w + "px";
+  clone.style.height = h + "px";
+  await replaceLogoWithBackground(clone);
+
+  const cssText  = document.getElementById("cardStyles").innerHTML || "";
+  const computed = getComputedStyle(document.documentElement);
+  const varNames = Array.from(cssText.matchAll(/--[a-z0-9\-]+/gi)).map(m=>m[0]);
+  const varSet   = Array.from(new Set(varNames));
+  const varBlock = varSet.map(n => `${n}: ${computed.getPropertyValue(n).trim() || 'initial'};`).join('');
+
+  const xhtml = `
+    <div xmlns="http://www.w3.org/1999/xhtml"
+         style="box-sizing:border-box;width:${w}px;height:${h}px;">
+<style>
+  #card-export-clone{ ${varBlock} }
+  ${cssText}
+</style>
+      ${clone.outerHTML}
+    </div>
+  `.trim();
+
+  let svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+      <defs>
+        <clipPath id="clipR">
+          <rect x="0" y="0" width="${w}" height="${h}" rx="${radius}" ry="${radius}"/>
+        </clipPath>
+      </defs>
+      <g clip-path="url(#clipR)">
+        <foreignObject x="0" y="0" width="${w}" height="${h}">${xhtml}</foreignObject>
+      </g>
+    </svg>
+  `.trim();
+
+  svg = svg.replace(/url\((["'])?https?:\/\/.*?\1\)/gi, "none");
+  return new Blob([svg], {type:"image/svg+xml"});
+}
+
+/* --- Replace your SVG button handler to use the same styled snapshot --- */
+document.getElementById("btnDownloadSVG")?.addEventListener("click", async ()=>{
+  try{
+    const card = document.getElementById("card");
+    const svg  = await buildStyledSVG(card, 1, 0.12); // same centering pad
+    forceDownload(new Blob([svg], {type:"image/svg+xml"}), "business-card.svg");
+  }catch(e){
+    console.error(e);
+    alert("SVG fallback failed.");
+  }
+  document.getElementById("sheet").close();
+});
 
 
 function forceDownload(blob, filename="business-card.png"){

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Responsive Business Card</title>
+
+<!-- ======== ONE PLACE TO EDIT: CONFIG BLOCK ======== -->
+<script>
+  const CONFIG = {
+    /* ---- Text ---- */
+    name:   "ThisCrazyLife",
+    title:  "Crazy Mfer",
+    company:"The Refresh",
+    addressLine: "555 Fre5h AF Blvd.",
+    wallet: "$F5",
+    mobile: "(555) 555-5555",
+    office: "(555) 420-6969",
+    email:  "tcl@therefreshcnft.com",
+    tagline:"#F5TW 🔄",
+
+    /* ---- Colors (descriptive) ---- */
+    colorAccentGlow: "#7bd3ff",      // accent glow behind the card
+    colorText:       "#1b1f27",      // main text
+    colorTextMuted:  "#5c667a",      // labels / subtle text
+    colorCanvas:     "#0b0f1a",      // page background base
+    colorCanvasMid:  "#0e1220",      // page background mid tone
+    colorPaperTop:   "#ff0000",      // card top gradient
+    colorPaperMid:   "#faf8f2",      // card mid gradient
+    colorPaperBot:   "#56fa29",      // card bottom gradient
+    colorPaperDot:   "rgba(0,0,0,.03)",
+    colorPaperFiber: "rgba(0,0,0,.02)",
+    colorShadowMain: "rgba(0,0,0,.35)",
+    colorShadowSoft: "rgba(0,0,0,.25)",
+
+    /* ---- Sizing / spacing ---- */
+    pad: "clamp(14px, 2.8vw, 28px)",
+    gap: "clamp(12px, 2.2vw, 24px)",
+    logoNudgeInline: "150px",
+    logoMaxW: "96%",
+    logoMaxH: "92%",
+
+    /* ---- Logo (URL or data URI) ---- */
+    logoSrc: "" /* e.g. "data:image/svg+xml;base64,..." */
+  };
+</script>
+<!-- ======== END CONFIG ======== -->
+
+<style id="cardStyles">
+  :root{
+    --accent-glow:#7bd3ff; --ink:#1b1f27; --muted:#5c667a;
+    --bg-base:#0b0f1a; --bg-mid:#0e1220;
+    --paper-top:#ffffff; --paper-mid:#faf8f2; --paper-bot:#f5f2ea;
+    --paper-dot:rgba(0,0,0,.03); --paper-fiber:rgba(0,0,0,.02);
+    --shadow-main:rgba(0,0,0,.35); --shadow-soft:rgba(0,0,0,.25);
+    --pad:clamp(14px, 2.8vw, 28px);
+    --gap:clamp(12px, 2.2vw, 24px);
+    --logo-nudge:150px; --logo-maxw:96%; --logo-maxh:92%;
+  }
+
+  html,body{height:100%;margin:0}
+  body{
+    display:grid; place-items:center; min-height:100svh; overflow:hidden;
+    background:
+      radial-gradient(900px 600px at 50% 60%, color-mix(in oklab, var(--accent-glow) 22%, var(--bg-mid)) 0%, var(--bg-mid) 60%, var(--bg-base) 100%),
+      var(--bg-base);
+    color:var(--ink);
+  }
+  .card{
+    aspect-ratio:3.5/2;
+    width:min(92vw, 720px);
+    max-height:92vh;
+    background:
+      radial-gradient(circle at 15% 10%, var(--paper-dot) 0 1px, transparent 1px) 0 0/4px 4px,
+      repeating-linear-gradient(135deg, var(--paper-fiber) 0 2px, transparent 2px 7px),
+      linear-gradient(180deg, var(--paper-top), var(--paper-mid) 70%, var(--paper-bot));
+    border-radius:14px;
+    box-shadow:0 24px 60px var(--shadow-main), 0 6px 18px var(--shadow-soft);
+    display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); padding:var(--pad); box-sizing:border-box;
+
+    cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent;
+  }
+  .left{ display:grid; grid-template-rows:min-content 1fr min-content; min-width:0 }
+  .nameblock{ align-self:start; text-align:left; }
+  .name{ font-size:clamp(1.2rem, 3.4vw, 2rem); font-weight:700; letter-spacing:.2px }
+  .title{ font-size:clamp(.85rem, 2vw, 1.1rem); color:var(--muted) }
+  .company{ margin-top:2px; font-size:clamp(.9rem, 2.1vw, 1.15rem) }
+
+  .logo{ margin-left:var(--logo-nudge); display:grid; align-items:center; justify-items:end; width:100%; height:100% }
+  .logo img{ display:block; max-width:var(--logo-maxw); max-height:var(--logo-maxh); height:auto; object-fit:contain }
+
+  .contacts{ align-self:end; display:grid; gap:clamp(6px,1.4vw,10px); font-size:clamp(.80rem, 1.9vw, 1.05rem); text-align:left }
+  .label{ color:var(--muted); margin-right:.4em }
+  .item{ overflow-wrap:anywhere; white-space:normal }
+
+  .right{ display:grid; grid-template-rows:min-content 1fr min-content; justify-items:end; row-gap:var(--gap); min-width:0 }
+  .group{ display:grid; gap:clamp(6px,1.4vw,10px); font-size:clamp(.80rem, 1.9vw, 1.05rem); text-align:left; width:max-content; max-width:100% }
+  .group .item{ overflow-wrap:anywhere }
+  .inline{ display:inline }
+  .tagline-right{ justify-self:end; text-align:right; color:var(--muted); font-size:clamp(.70rem, 1.6vw, .95rem); line-height:1.25; max-width:100%; overflow-wrap:anywhere }
+
+  @media (max-width:560px){
+    .card{ grid-template-columns:1fr; aspect-ratio:auto }
+    .logo{ min-height:160px; justify-items:center; margin-left:0 }
+    .right{ justify-items:start }
+    .tagline-right{ text-align:left }
+  }
+</style>
+</head>
+<body>
+  <main class="card" id="card" role="button" aria-label="Business Card (tap to share or download)">
+    <section class="left" aria-label="Brand & Identity">
+      <header class="nameblock">
+        <div class="name"    id="name"></div>
+        <div class="title"   id="title"></div>
+        <div class="company" id="company"></div>
+      </header>
+
+      <div class="logo" aria-label="Logo">
+        <img id="logoImg" alt="Logo" src="">
+      </div>
+
+      <div class="contacts" aria-label="Phones & Email">
+        <div class="item"><span class="label">Mobile:</span> <span id="mobile"></span></div>
+        <div class="item"><span class="label">Office:</span> <span id="office"></span></div>
+        <div class="item"><span class="label">Email:</span> <span id="email"></span></div>
+      </div>
+    </section>
+
+    <section class="right" aria-label="Addresses & Tagline">
+      <div class="group" aria-label="Address (top-right)">
+        <div class="item">
+          <span class="label inline">Address:</span>
+          <span class="inline" id="addressLine"></span>
+        </div>
+        <div class="item"><span class="label">Wallet:</span> <span id="wallet"></span></div>
+      </div>
+
+      <div></div> <!-- spacer -->
+
+      <div class="tagline-right" id="tagline" aria-label="Tag Line"></div>
+    </section>
+  </main>
+
+<script>
+/* ---------- Apply CONFIG ---------- */
+(function applyConfig(c){
+  const $ = id => document.getElementById(id);
+  $("name").textContent       = c.name;
+  $("title").textContent      = c.title;
+  $("company").textContent    = c.company;
+  $("addressLine").textContent= c.addressLine;
+  $("wallet").textContent     = c.wallet;
+  $("mobile").textContent     = c.mobile;
+  $("office").textContent     = c.office;
+  $("email").textContent      = c.email;
+  $("tagline").textContent    = c.tagline;
+
+  const placeholderSVG = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPHN2ZyBpZD0ic3ZnMiIgdmlld0JveD0iMCAwIDc1MC45NyA1MzcuNyIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgogIDxkZWZzIGlkPSJkZWZzNCI+CiAgICA8ZmlsdGVyIGlkPSJmaWx0ZXIzMTI3IiBoZWlnaHQ9IjEuNSIgd2lkdGg9IjEuNSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIiB5PSItLjI1IiB4PSItLjI1Ij4KICAgICAgPGZlR2F1c3NpYW5CbHVyIGlkPSJmZUdhdXNzaWFuQmx1cjMxMjkiIHJlc3VsdD0iYmx1ciIgc3RkRGV2aWF0aW9uPSIxMCIgaW49IlNvdXJjZUFscGhhIi8+CiAgICAgIDxmZUNvbG9yTWF0cml4IGlkPSJmZUNvbG9yTWF0cml4MzEzMSIgdmFsdWVzPSIxIDAgMCAwIDAgMCAxIDAgMCAwIDAgMCAxIDAgMCAwIDAgMCAwLjUgMCAiIHR5cGU9Im1hdHJpeCIgcmVzdWx0PSJibHVyYWxwaGEiLz4KICAgICAgPGZlT2Zmc2V0IGlkPSJmZU9mZnNldDMxMzMiIHJlc3VsdD0ib2Zmc2V0Qmx1ciIgZHk9IjUiIGR4PSI1IiBpbj0iYmx1cmFscGhhIi8+CiAgICAgIDxmZU1lcmdlIGlkPSJmZU1lcmdlMzEzNSI+CiAgICAgICAgPGZlTWVyZ2VOb2RlIGlkPSJmZU1lcmdlTm9kZTMxMzciIGluPSJvZmZzZXRCbHVyIi8+CiAgICAgICAgPGZlTWVyZ2VOb2RlIGlkPSJmZU1lcmdlTm9kZTMxMzkiIGluPSJTb3VyY2VHcmFwaGljIi8+CiAgICAgIDwvZmVNZXJnZT4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8ZyBpZD0ibGF5ZXIxIiB0cmFuc2Zvcm09Im1hdHJpeCgxLjM4OTA3OSwgMCwgMCwgMS4zODkwNzksIDYuNDA4MzI1LCAtMzA3LjMzNzA5NykiIHN0eWxlPSIiPgogICAgPHBhdGggaWQ9InBhdGgzMDU3IiBzdHlsZT0ic3Ryb2tlLWxpbmVjYXA6IHJvdW5kOyBzdHJva2Utd2lkdGg6IDM7IGZpbHRlcjogdXJsKCNmaWx0ZXIzMTI3KTsgZmlsbDogI0ZGMDkwMDsgc3Ryb2tlOiAjMDA3OUZGOyIgZD0iTSAzMzkuNjcxIDM1Ny44NDQgTCAyNzcuNTQ2IDQyMC4xODggTCAzNjIuOTUyIDQyMC4wNjMgQyAzNjIuOTEgNDcyLjI4NCAzMjAuNTUyIDUxNC41ODggMjY4LjMyNyA1MTQuNTYzIEMgMjM3LjA0MyA1MTQuNTQ4IDIwOS4zMTMgNDk5LjM0OCAxOTIuMTA4IDQ3NS45MzggTCAxODkuMjQ1IDQ3Mi4zNjkgTCAxMzIuMDE1IDUyNy4zNzYgQyAxNjMuNzg2IDU2Ny42NTcgMjEzLjAxNSA1OTMuNTM3IDI2OC4yOTUgNTkzLjU2NCBDIDM2NC4xNTYgNTkzLjYxIDQ0MS45MDUgNTE1LjkyNSA0NDEuOTU1IDQyMC4wNjQgQyA0NDEuOTU1IDQyMC4wMjIgNDQxLjk1NSA0MTkuOTgxIDQ0MS45NTUgNDE5LjkzOSBMIDUxMi40ODYgNDE5LjgxNCBMIDQwNC4yMDYgMzExLjkwNCBMIDM5NS42NDMgMzA0LjI1NiBMIDMzOS42NzEgMzU3Ljg0NCBaIi8+CiAgICA8cGF0aCBpZD0icGF0aDMxMDEiIHN0eWxlPSJzdHJva2UtbGluZWNhcDogcm91bmQ7IHN0cm9rZS13aWR0aDogMzsgZmlsdGVyOiB1cmwoI2ZpbHRlcjMxMjcpOyBmaWxsOiAjMDBGMTFEOyBzdHJva2U6ICNGRjdGMDA7IiBkPSJNIDE4Ny42NDcgNDczLjgxNCBMIDI0OS43NzIgNDExLjQ3IEwgMTY0LjM2NiA0MTEuNTk1IEMgMTY0LjQwOCAzNTkuMzc0IDIwNi43NjYgMzE3LjA3IDI1OC45OTEgMzE3LjA5NSBDIDI5MC4yNzUgMzE3LjExIDMxOC4wMDUgMzMyLjMxIDMzNS4yMSAzNTUuNzIgTCAzMzcuOTExIDM1OS41NDEgTCAzOTUuNDkzIDMwNC40MDggQyAzNjMuNzIyIDI2NC4xMjcgMzE0LjMwNCAyMzguMTIxIDI1OS4wMjMgMjM4LjA5NCBDIDE2My4xNjIgMjM4LjA0OCA4NS40MTMgMzE1LjczMyA4NS4zNjMgNDExLjU5NCBDIDg1LjM2MyA0MTEuNjM2IDg1LjM2MyA0MTEuNjc4IDg1LjM2MyA0MTEuNzE5IEwgMTQuODMyIDQxMS44NDQgTCAxMjMuMTEyIDUxOS43NTQgTCAxMzEuNjc1IDUyNy40MDMgTCAxODcuNjQ3IDQ3My44MTQgWiIvPgogIDwvZz4KICA8cGF0aCBkPSJNIDM3Ny44MzkgMjY4LjA5MiBMIDM1MS4yOTMgMjIyLjc2OCBMIDI4Mi40MzggMjI3LjUyMSBMIDI5MC42NjggMjY1LjU0MiBMIDMyMC4xMTEgMjUyLjkwNyBMIDMzMi41MTUgMjM1LjUxOSBMIDM1NC41MzkgMzMyLjY1OCBMIDMyOS44NDkgMjk4LjQ2MiBMIDI4OC4zNSAyOTYuMTQ0IEwgMzAxLjQ0OSAzNDcuMzggTCAzMjQuODY0IDM2Mi43OTcgTCAxODYuOTIyIDM1My4wNiBMIDIxMy4xMTkgMzM1Ljc4OCBMIDIyNy4zNzcgMjE5LjYzOCBMIDE4Ni45MjIgMjAwLjM5NiBMIDM2My4xMTcgMTgzLjgxOSBaIE0gNDM0Ljk3NSAyMTYuODU2IEwgNDE5LjMyNiAyNTEuMjg0IFEgNDI2Ljg2MSAyNDguMTU0IDQzNi41NCAyNDYuNzA1IFEgNDQ2LjIxOSAyNDUuMjU2IDQ2MS4xNzMgMjQ1LjI1NiBRIDUwOS4xNjMgMjQ1LjI1NiA1MzYuMDU2IDI2MC43MzEgUSA1NjIuOTQ5IDI3Ni4yMDYgNTYyLjk0OSAzMDMuNDQ3IFEgNTYyLjk0OSAzMjkuNjQ0IDUzOC42MDYgMzQ1LjQwOSBRIDUxNC4yNjMgMzYxLjE3NCA0NzMuMjI4IDM2MS4xNzQgUSA0NTAuOTcyIDM2MS4xNzQgNDMyLjAxOSAzNTQuNTY3IFEgNDEzLjA2NyAzNDcuOTU5IDM5Ny4wNyAzMzQuNTEzIEwgMzgxLjMwNSAzNDcuODQzIEwgMzk3LjUzNCAyODguNzI1IFEgNDEwLjE2OSAzMDguMDg0IDQyMi44NjIgMzE2Ljk1MSBRIDQzNS41NTUgMzI1LjgxOSA0NTAuMzkyIDMyNS44MTkgUSA0NjMuOTU1IDMyNS44MTkgNDcxLjU0NyAzMTkuNTAxIFEgNDc5LjE0IDMxMy4xODQgNDc5LjE0IDMwMi4wNTYgUSA0NzkuMTQgMjg3LjkxNCA0NjguNzY1IDI4MC4yNjMgUSA0NTguMzkxIDI3Mi42MTMgNDM5LjI2NCAyNzIuNjEzIFEgNDIyLjU3MiAyNzIuNjEzIDQwOC4yNTYgMjc1LjkxNiBRIDM5My45NCAyNzkuMjIgMzgxLjg4NSAyODUuOTQzIEwgNDAxLjI0MyAxODUuMjExIEwgNTMzLjUwNSAxOTQuMDIgTCA1MzkuNjQ5IDE4MS43MzMgTCA1NDcuNzYzIDI1NC41MjkgTCA1MzYuNjM1IDIzNy43MjEgWiIgc3R5bGU9ImZpbGw6IHJnYig1MSwgNTEsIDUxKTsgc3Ryb2tlOiByZ2IoMjU1LCAyNTUsIDI1NSk7IHN0cm9rZS13aWR0aDogM3B4OyB3aGl0ZS1zcGFjZTogcHJlOyIvPgo8L3N2Zz4K";
+  const logo = $("logoImg");
+  logo.src = c.logoSrc && c.logoSrc.trim() ? c.logoSrc : placeholderSVG;
+
+  const r = document.documentElement;
+  r.style.setProperty('--accent-glow', c.colorAccentGlow);
+  r.style.setProperty('--ink',         c.colorText);
+  r.style.setProperty('--muted',       c.colorTextMuted);
+  r.style.setProperty('--bg-base',     c.colorCanvas);
+  r.style.setProperty('--bg-mid',      c.colorCanvasMid);
+  r.style.setProperty('--paper-top',   c.colorPaperTop);
+  r.style.setProperty('--paper-mid',   c.colorPaperMid);
+  r.style.setProperty('--paper-bot',   c.colorPaperBot);
+  r.style.setProperty('--paper-dot',   c.colorPaperDot);
+  r.style.setProperty('--paper-fiber', c.colorPaperFiber);
+  r.style.setProperty('--shadow-main', c.colorShadowMain);
+  r.style.setProperty('--shadow-soft', c.colorShadowSoft);
+  r.style.setProperty('--pad',         c.pad);
+  r.style.setProperty('--gap',         c.gap);
+  r.style.setProperty('--logo-nudge',  c.logoNudgeInline);
+  r.style.setProperty('--logo-maxw',   c.logoMaxW);
+  r.style.setProperty('--logo-maxh',   c.logoMaxH);
+})(CONFIG);
+
+/* ---------- Click to Share / Download ---------- */
+(async function setupShare(){
+  const card = document.getElementById("card");
+
+  async function cardToBlobPNG() {
+    // Measure
+    const rect = card.getBoundingClientRect();
+    const scale = Math.min(2, window.devicePixelRatio || 1) * 2; // crisp but safe
+    const w = Math.max(1, Math.round(rect.width  * scale));
+    const h = Math.max(1, Math.round(rect.height * scale));
+
+    // Build a self-contained HTML for foreignObject: include CSS + current :root vars
+    const cssText = document.getElementById("cardStyles").innerHTML;
+    const computedVars = getComputedStyle(document.documentElement);
+    const varNames = Array.from(cssText.matchAll(/--[a-z0-9\-]+/gi)).map(m=>m[0]);
+    const uniqVars = Array.from(new Set(varNames));
+    const varBlock = uniqVars.map(n=>`${n}: ${computedVars.getPropertyValue(n).trim() || 'initial'};`).join('');
+
+    // Extract the current card DOM
+    const cardHTML = card.outerHTML;
+
+    // XHTML doc inside foreignObject
+    const xhtml = `
+      <div xmlns="http://www.w3.org/1999/xhtml">
+        <style>:root{${varBlock}}${cssText}</style>
+        ${cardHTML}
+      </div>
+    `.trim();
+
+    // SVG wrapper
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+        <foreignObject width="100%" height="100%">
+          ${xhtml}
+        </foreignObject>
+      </svg>
+    `.trim();
+
+    const svgBlob = new Blob([svg], {type:"image/svg+xml"});
+    const url = URL.createObjectURL(svgBlob);
+    try {
+      const img = new Image();
+      img.decoding = "async";
+      img.crossOrigin = "anonymous";
+      await new Promise((res, rej)=>{
+        img.onload = res; img.onerror = rej; img.src = url;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      return await new Promise(res=>canvas.toBlob(b=>res(b), "image/png", 0.95));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function downloadBlob(blob, filename="business-card.png"){
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+
+  async function shareOrDownload(){
+    // Let the user pick: Share via apps or Download image
+    const wantsShare = confirm("Share via your apps?\nPress Cancel to download an image instead.");
+    const blob = await cardToBlobPNG();
+    if (!blob) return;
+
+    if (wantsShare && navigator.canShare && navigator.share) {
+      const file = new File([blob], "business-card.png", {type:"image/png"});
+      if (navigator.canShare({files:[file]})) {
+        try {
+          await navigator.share({
+            title: `${CONFIG.name} — ${CONFIG.company}`,
+            text: CONFIG.tagline || "My business card",
+            files: [file],
+          });
+          return;
+        } catch (err) {
+          // fall through to download if user cancels or share fails
+        }
+      }
+    }
+    downloadBlob(blob);
+  }
+
+  card.addEventListener("click", ()=>{ shareOrDownload(); }, {passive:true});
+})();
+</script>
+</body>
+</html>
+    

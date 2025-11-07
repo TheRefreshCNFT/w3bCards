@@ -33,18 +33,19 @@
     colorShadowMain: "rgba(0,0,0,.35)",
     colorShadowSoft: "rgba(0,0,0,.25)",
 
-    /* ---- Sizing / spacing ---- */
+    /* spacing / logo */
     pad: "clamp(14px, 2.8vw, 28px)",
     gap: "clamp(12px, 2.2vw, 24px)",
-    logoNudgeInline: "150px",
-    logoMaxW: "96%",
-    logoMaxH: "92%",
+    logoNudgeInline: "164px",
+    logoMaxW: "100%",
+    logoMaxH: "100%",
 
-    /* ---- Logo (URL or data URI) ---- */
-    logoSrc: "" /* e.g. "data:image/svg+xml;base64,..." */
+    /* logo image */
+    /* logo image (URL or data URI) */
+    logoSrc: "" // e.g. "data:image/svg+xml;base64,...." or "logo.png"
   };
 </script>
-<!-- ======== END CONFIG ======== -->
+<!-- ========== END CONFIG ========== -->
 
 <style id="cardStyles">
   :root{
@@ -57,7 +58,6 @@
     --gap:clamp(12px, 2.2vw, 24px);
     --logo-nudge:150px; --logo-maxw:96%; --logo-maxh:92%;
   }
-
   html,body{height:100%;margin:0}
   body{
     display:grid; place-items:center; min-height:100svh; overflow:hidden;
@@ -81,7 +81,7 @@
     cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent;
   }
   .left{ display:grid; grid-template-rows:min-content 1fr min-content; min-width:0 }
-  .nameblock{ align-self:start; text-align:left; }
+  .nameblock{ align-self:start; text-align:left }
   .name{ font-size:clamp(1.2rem, 3.4vw, 2rem); font-weight:700; letter-spacing:.2px }
   .title{ font-size:clamp(.85rem, 2vw, 1.1rem); color:var(--muted) }
   .company{ margin-top:2px; font-size:clamp(.9rem, 2.1vw, 1.15rem) }
@@ -98,6 +98,22 @@
   .group .item{ overflow-wrap:anywhere }
   .inline{ display:inline }
   .tagline-right{ justify-self:end; text-align:right; color:var(--muted); font-size:clamp(.70rem, 1.6vw, .95rem); line-height:1.25; max-width:100%; overflow-wrap:anywhere }
+
+  /* Action sheet */
+  .sheet{ position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.35) }
+  .sheet[open]{ display:grid }
+  .sheet-card{
+    background:#fff; color:#0d1117; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,.45);
+    width:min(92vw, 420px); padding:16px; font: 500 16px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }
+  .sheet h3{ margin:0 0 12px 0; font-size:18px }
+  .btnrow{ display:grid; gap:10px }
+  .btn{ padding:12px 14px; border-radius:10px; border:1px solid #e5e7eb; background:#f8fafc; cursor:pointer; text-align:center }
+  .btn:hover{ background:#eef2f7 }
+  .btn.primary{ background:#0ea5e9; color:#fff; border-color:#0ea5e9 }
+  .btn.primary:hover{ filter:brightness(0.95) }
+  .btn.ghost{ background:#fff }
+  .btn.cancel{ margin-top:4px }
 
   @media (max-width:560px){
     .card{ grid-template-columns:1fr; aspect-ratio:auto }
@@ -136,13 +152,77 @@
         <div class="item"><span class="label">Wallet:</span> <span id="wallet"></span></div>
       </div>
 
-      <div></div> <!-- spacer -->
-
+      <div></div>
       <div class="tagline-right" id="tagline" aria-label="Tag Line"></div>
     </section>
   </main>
 
+  <!-- Action sheet -->
+  <dialog class="sheet" id="sheet">
+    <div class="sheet-card">
+      <h3>Share your card</h3>
+      <div class="btnrow">
+        <button class="btn primary" id="btnShare">Share via apps</button>
+        <button class="btn ghost"   id="btnDownload">Download PNG</button>
+        <button class="btn ghost" id="btnDownloadSVG">Download SVG (fallback)</button>
+        <button class="btn cancel"  id="btnCancel">Cancel</button>
+      </div>
+    </div>
+  </dialog>
+
 <script>
+  async function replaceLogoWithBackground(cloneRoot){
+  const liveLogo = document.getElementById("logoImg");
+  const slot     = cloneRoot.querySelector(".logo");
+  if (!slot) return;
+
+  // Remove any <img> in the clone to keep XHTML clean
+  const imgInClone = slot.querySelector("img");
+  if (imgInClone) imgInClone.remove();
+
+  // Build a data URL for the logo if needed
+  let data = "";
+  const src = (liveLogo && liveLogo.src) ? liveLogo.src : "";
+  if (src) {
+    if (src.startsWith("data:")) {
+      data = src;
+    } else {
+      try {
+        const res = await fetch(src, {mode:"cors"});
+        const blob = await res.blob();
+        data = await new Promise(r => {
+          const fr = new FileReader();
+          fr.onload = () => r(fr.result);
+          fr.readAsDataURL(blob);
+        });
+      } catch { /* If CORS blocks, we export without logo instead of failing */ }
+    }
+  }
+
+  const style = slot.getAttribute("style") || "";
+  slot.setAttribute(
+    "style",
+    `background-image:${data ? `url('${data}')` : "none"};` +
+    `background-position:center;` +
+    `background-repeat:no-repeat;` +
+    `background-size:contain;` +
+    style
+  );
+}
+
+// Inline computed styles for every element in a subtree
+function inlineStylesDeep(root){
+  const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  do {
+    const el = tw.currentNode;
+    const cs = getComputedStyle(el);
+    const styleText = Array.from(cs).map(p => `${p}:${cs.getPropertyValue(p)};`).join('');
+    el.setAttribute("style", styleText);
+    // extra safety: no images survive in the export XHTML
+    if (el.tagName === "IMG") el.remove();
+  } while (tw.nextNode());
+}
+
 /* ---------- Apply CONFIG ---------- */
 (function applyConfig(c){
   const $ = id => document.getElementById(id);
@@ -180,97 +260,244 @@
   r.style.setProperty('--logo-maxh',   c.logoMaxH);
 })(CONFIG);
 
-/* ---------- Click to Share / Download ---------- */
-(async function setupShare(){
-  const card = document.getElementById("card");
+/* ---------- Helpers for safe export ---------- */
+// Turn a URL (same-origin or cross-origin) into a data URL for export
+async function toDataURL(url){
+  const res = await fetch(url, {mode:"cors"});
+  const blob = await res.blob();
+  return await new Promise((resolve)=>{
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.readAsDataURL(blob);
+  });
+}
 
-  async function cardToBlobPNG() {
-    // Measure
-    const rect = card.getBoundingClientRect();
-    const scale = Math.min(2, window.devicePixelRatio || 1) * 2; // crisp but safe
-    const w = Math.max(1, Math.round(rect.width  * scale));
-    const h = Math.max(1, Math.round(rect.height * scale));
+// Inline computed styles recursively so the snapshot needs no external CSS
+function inlineStylesDeep(root){
+  const treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+  do {
+    const el = treeWalker.currentNode;
+    const cs = getComputedStyle(el);
+    // Build a minimal but robust style set
+    const styleText = Array.from(cs)
+      .map(prop => `${prop}:${cs.getPropertyValue(prop)};`)
+      .join('');
+    el.setAttribute("style", styleText);
 
-    // Build a self-contained HTML for foreignObject: include CSS + current :root vars
-    const cssText = document.getElementById("cardStyles").innerHTML;
-    const computedVars = getComputedStyle(document.documentElement);
-    const varNames = Array.from(cssText.matchAll(/--[a-z0-9\-]+/gi)).map(m=>m[0]);
-    const uniqVars = Array.from(new Set(varNames));
-    const varBlock = uniqVars.map(n=>`${n}: ${computedVars.getPropertyValue(n).trim() || 'initial'};`).join('');
-
-    // Extract the current card DOM
-    const cardHTML = card.outerHTML;
-
-    // XHTML doc inside foreignObject
-    const xhtml = `
-      <div xmlns="http://www.w3.org/1999/xhtml">
-        <style>:root{${varBlock}}${cssText}</style>
-        ${cardHTML}
-      </div>
-    `.trim();
-
-    // SVG wrapper
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-        <foreignObject width="100%" height="100%">
-          ${xhtml}
-        </foreignObject>
-      </svg>
-    `.trim();
-
-    const svgBlob = new Blob([svg], {type:"image/svg+xml"});
-    const url = URL.createObjectURL(svgBlob);
-    try {
-      const img = new Image();
-      img.decoding = "async";
-      img.crossOrigin = "anonymous";
-      await new Promise((res, rej)=>{
-        img.onload = res; img.onerror = rej; img.src = url;
-      });
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, w, h);
-      return await new Promise(res=>canvas.toBlob(b=>res(b), "image/png", 0.95));
-    } finally {
-      URL.revokeObjectURL(url);
+    // Remove attributes that can pull external resources during rasterize
+    if (el.tagName === "IMG"){
+      // src will be set later (already data URL at this point)
+      el.removeAttribute("srcset");
+      el.removeAttribute("crossorigin");
+      el.decoding = "sync";
+      el.loading = "eager";
     }
-  }
+  } while (treeWalker.nextNode());
+  return root;
+}
 
-  function downloadBlob(blob, filename="business-card.png"){
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
-  }
+// Build a PNG from the card by cloning, inlining styles, and ensuring images are safe
+async function cardToPNGBlob(cardEl){
+  // 1) Clone so we can freeze size and swap the logo without touching the page
+  const clone = cardEl.cloneNode(true);
 
-  async function shareOrDownload(){
-    // Let the user pick: Share via apps or Download image
-    const wantsShare = confirm("Share via your apps?\nPress Cancel to download an image instead.");
-    const blob = await cardToBlobPNG();
-    if (!blob) return;
+  // Lock size to on-screen pixels
+  const rect = cardEl.getBoundingClientRect();
+  clone.style.width  = rect.width  + "px";
+  clone.style.height = rect.height + "px";
 
-    if (wantsShare && navigator.canShare && navigator.share) {
-      const file = new File([blob], "business-card.png", {type:"image/png"});
-      if (navigator.canShare({files:[file]})) {
-        try {
-          await navigator.share({
-            title: `${CONFIG.name} — ${CONFIG.company}`,
-            text: CONFIG.tagline || "My business card",
-            files: [file],
-          });
-          return;
-        } catch (err) {
-          // fall through to download if user cancels or share fails
-        }
+  // Swap the <img> logo for a CSS background so XHTML is clean
+  await replaceLogoWithBackground(clone);
+
+  // 2) Build a <style> that includes your original CSS + resolved CSS variables
+  const cssText = document.getElementById("cardStyles").innerHTML;
+  const computed = getComputedStyle(document.documentElement);
+  const varNames = Array.from(cssText.matchAll(/--[a-z0-9\-]+/gi)).map(m=>m[0]);
+  const varSet = Array.from(new Set(varNames));
+  const varBlock = varSet.map(n => `${n}: ${computed.getPropertyValue(n).trim() || 'initial'};`).join('');
+
+  // 3) Pack XHTML with the style so grid stays intact
+  const xhtml = `
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <style>:root{${varBlock}}${cssText}</style>
+      ${clone.outerHTML}
+    </div>
+  `.trim();
+
+  // 4) Wrap in SVG/foreignObject and rasterize
+  const scale = Math.min(2, (window.devicePixelRatio||1) * 2);
+  const w = Math.max(1, Math.round(rect.width  * scale));
+  const h = Math.max(1, Math.round(rect.height * scale));
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+      <foreignObject width="100%" height="100%">${xhtml}</foreignObject>
+    </svg>
+  `.trim();
+
+  const blobURL = URL.createObjectURL(new Blob([svg], {type:"image/svg+xml"}));
+  try{
+    const img = new Image();
+    img.decoding = "async";
+    await new Promise((res, rej)=>{ img.onload=res; img.onerror=rej; img.src=blobURL; });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+
+    return await new Promise(resolve => {
+      if (canvas.toBlob){
+        canvas.toBlob(b => resolve(b), "image/png", 0.95);
+      } else {
+        const dataURL = canvas.toDataURL("image/png", 0.95);
+        const bin = atob(dataURL.split(",")[1]);
+        const arr = new Uint8Array(bin.length);
+        for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+        resolve(new Blob([arr], {type:"image/png"}));
       }
+    });
+  } finally {
+    URL.revokeObjectURL(blobURL);
+  }
+}
+
+
+
+function forceDownload(blob, filename="business-card.png"){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+
+/* ---------- Action sheet wiring ---------- */
+(function shareSetup(){
+  const card  = document.getElementById("card");
+  const sheet = document.getElementById("sheet");
+  const btnShare = document.getElementById("btnShare");
+  const btnDownload = document.getElementById("btnDownload");
+  const btnCancel = document.getElementById("btnCancel");
+
+  // Hide Share button if Web Share API w/ files isn't available
+    const canNativeShare = !!(navigator.share && navigator.canShare && (() => {
+      try {
+        return navigator.canShare({ files: [ new File(["x"], "x.txt", { type: "text/plain" }) ] });
+      } catch (e) {
+        return false;
+      }
+    })());
+    if (!canNativeShare) btnShare.style.display = "none";
+
+  card.addEventListener("click", ()=>{ sheet.showModal(); }, {passive:true});
+  btnCancel.addEventListener("click", ()=> sheet.close());
+
+btnDownload.addEventListener("click", async ()=>{
+  try{
+    const blob = await cardToPNGBlob(card);
+    if (blob) forceDownload(blob, "business-card.png");
+  }catch(e){
+    console.error(e);
+    alert("Couldn't create image: " + (e && e.message ? e.message : "unknown error"));
+  }
+  sheet.close();
+});
+
+  btnShare.addEventListener("click", async ()=>{
+    try{
+      const blob = await cardToPNGBlob(card);
+      if (!blob) throw new Error("No image");
+      const file = new File([blob], "business-card.png", {type:"image/png"});
+      await navigator.share({
+        title: `${CONFIG.name} — ${CONFIG.company}`,
+        text: CONFIG.tagline || "My business card",
+        files:[file]
+      });
+    }catch(e){
+      // user cancelled or share not available
     }
-    downloadBlob(blob);
+    sheet.close();
+  });
+
+
+document.getElementById("btnDownloadSVG")?.addEventListener("click", async ()=>{
+  try{
+    const card  = document.getElementById("card");
+    const clone = card.cloneNode(true);
+
+    const rect = card.getBoundingClientRect();
+    clone.style.width  = rect.width  + "px";
+    clone.style.height = rect.height + "px";
+
+    await replaceLogoWithBackground(clone);
+    inlineStylesDeep(clone);
+
+    const xhtml =
+      `<div xmlns="http://www.w3.org/1999/xhtml" ` +
+      `style="display:inline-block;background:#fff;border-radius:14px;">${clone.outerHTML}</div>`;
+
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(rect.width)}" height="${Math.round(rect.height)}">` +
+        `<foreignObject width="100%" height="100%">${xhtml}</foreignObject>` +
+      `</svg>`;
+
+    const blob = new Blob([svg], {type:"image/svg+xml"});
+    forceDownload(blob, "business-card.svg");
+  }catch(e){
+    console.error(e);
+    alert("SVG fallback failed.");
+  }
+  document.getElementById("sheet").close();
+});
+
+
+// Turn the <img id="logoImg"> into a background-image on its parent (.logo)
+// in the CLONE we export. This avoids <img> inside XHTML.
+async function replaceLogoWithBackground(cloneRoot){
+  const live = document.getElementById("logoImg");
+  const slot = cloneRoot.querySelector(".logo");
+  const toDataURL = async (url)=>{
+    const res = await fetch(url, {mode:"cors"});
+    const blob = await res.blob();
+    const fr = await new Promise(r => {
+      const f = new FileReader();
+      f.onload = () => r(f.result);
+      f.readAsDataURL(blob);
+    });
+    return fr;
+  };
+
+  if (!slot) return;
+  // remove any img in the clone
+  const imgInClone = slot.querySelector("img");
+  if (imgInClone) imgInClone.remove();
+
+  // figure out a safe data URL
+  let data = "";
+  if (live && live.src) {
+    data = live.src.startsWith("data:")
+      ? live.src
+      : await (async ()=>{ try { return await toDataURL(live.src); } catch { return ""; } })();
   }
 
-  card.addEventListener("click", ()=>{ shareOrDownload(); }, {passive:true});
+  // paint as bg (center/contain/no-repeat) so export looks identical
+  const bg = data || "none";
+  const style = slot.getAttribute("style") || "";
+  slot.setAttribute(
+    "style",
+    `background-image:url('${bg}');background-position:center;background-repeat:no-repeat;background-size:contain;${style}`
+  );
+}
+
+
+
+  // Close on backdrop click
+  sheet.addEventListener("click", (e)=>{
+    const r = sheet.querySelector(".sheet-card");
+    if (r && !r.contains(e.target)) sheet.close();
+  });
 })();
 </script>
 </body>

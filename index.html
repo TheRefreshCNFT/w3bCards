@@ -298,47 +298,50 @@ function inlineStylesDeep(root){
 
 // Build a PNG from the card by cloning, inlining styles, and ensuring images are safe
 async function cardToPNGBlob(cardEl){
-  // 1) Clone so we can freeze size and swap the logo without touching the page
+  // Clone & lock size to on-screen pixels
   const clone = cardEl.cloneNode(true);
-
-  // Lock size to on-screen pixels
   const rect = cardEl.getBoundingClientRect();
   clone.style.width  = rect.width  + "px";
   clone.style.height = rect.height + "px";
 
-  // Swap the <img> logo for a CSS background so XHTML is clean
+  // Make the logo XHTML-safe (no <img>), only data: URLs allowed
   await replaceLogoWithBackground(clone);
 
-  // 2) Build a <style> that includes your original CSS + resolved CSS variables
-  const cssText = document.getElementById("cardStyles").innerHTML;
-  const computed = getComputedStyle(document.documentElement);
-  const varNames = Array.from(cssText.matchAll(/--[a-z0-9\-]+/gi)).map(m=>m[0]);
-  const varSet = Array.from(new Set(varNames));
-  const varBlock = varSet.map(n => `${n}: ${computed.getPropertyValue(n).trim() || 'initial'};`).join('');
+  // Original CSS + resolved CSS variables (preserve grid)
+  const cssText   = document.getElementById("cardStyles").innerHTML;
+  const computed  = getComputedStyle(document.documentElement);
+  const varNames  = Array.from(cssText.matchAll(/--[a-z0-9\-]+/gi)).map(m=>m[0]);
+  const varSet    = Array.from(new Set(varNames));
+  const varBlock  = varSet.map(n => `${n}: ${computed.getPropertyValue(n).trim() || 'initial'};`).join('');
 
-  // 3) Pack XHTML with the style so grid stays intact
+  // XHTML payload
   const xhtml = `
-    <div xmlns="http://www.w3.org/1999/xhtml">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="display:inline-block;border-radius:14px;">
       <style>:root{${varBlock}}${cssText}</style>
       ${clone.outerHTML}
     </div>
   `.trim();
 
-  // 4) Wrap in SVG/foreignObject and rasterize
+  // Wrap in SVG (with solid white background) and **scrub any http(s) url()** to avoid taint
   const scale = Math.min(2, (window.devicePixelRatio||1) * 2);
   const w = Math.max(1, Math.round(rect.width  * scale));
   const h = Math.max(1, Math.round(rect.height * scale));
 
-  const svg = `
+  let svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+      <rect width="100%" height="100%" fill="#ffffff"/>
       <foreignObject width="100%" height="100%">${xhtml}</foreignObject>
     </svg>
   `.trim();
 
+  // Hard scrub: if any external url() sneaks in, nuke it to prevent taint
+  svg = svg.replace(/url\((["'])?https?:\/\/.*?\1\)/gi, "none");
+
   const blobURL = URL.createObjectURL(new Blob([svg], {type:"image/svg+xml"}));
   try{
     const img = new Image();
-    img.decoding = "async";
+    img.crossOrigin = "anonymous";   // belt & suspenders
+    img.decoding    = "async";
     await new Promise((res, rej)=>{ img.onload=res; img.onerror=rej; img.src=blobURL; });
 
     const canvas = document.createElement("canvas");
@@ -346,15 +349,17 @@ async function cardToPNGBlob(cardEl){
     const ctx = canvas.getContext("2d");
     ctx.drawImage(img, 0, 0, w, h);
 
-    return await new Promise(resolve => {
-      if (canvas.toBlob){
-        canvas.toBlob(b => resolve(b), "image/png", 0.95);
+    return await new Promise((resolve, reject) => {
+      if (!canvas.toBlob) {
+        try {
+          const dataURL = canvas.toDataURL("image/png", 0.95);
+          const bin = atob(dataURL.split(",")[1]);
+          const arr = new Uint8Array(bin.length);
+          for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+          resolve(new Blob([arr], {type:"image/png"}));
+        } catch(e){ reject(e); }
       } else {
-        const dataURL = canvas.toDataURL("image/png", 0.95);
-        const bin = atob(dataURL.split(",")[1]);
-        const arr = new Uint8Array(bin.length);
-        for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-        resolve(new Blob([arr], {type:"image/png"}));
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png", 0.95);
       }
     });
   } finally {
